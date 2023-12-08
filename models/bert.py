@@ -7,19 +7,15 @@ import mlx.nn as nn
 class BertEmbeddings(nn.Module):
 	def __init__(self, config):
 		super().__init__()
-		# self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id)
 		self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size)
 		self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
 		self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
 		
 		self.position_ids = mx.expand_dims(mx.arange(0, config.max_position_embeddings), axis = 0)
 		self.token_type_ids = mx.zeros((1, config.max_position_embeddings))
-
-		# self.LayerNorm is not snake-cased to stick with TensorFlow model variable name and be able to load
-		# any TensorFlow checkpoint file
+		
 		self.LayerNorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
 		self.dropout = nn.Dropout(config.hidden_dropout_prob)
-		# position_ids (1, len position emb) is contiguous in memory and exported when serialized
 		self.position_embedding_type = getattr(config, "position_embedding_type", "absolute")
 
 	def __call__(
@@ -92,10 +88,7 @@ class BertSelfAttention(nn.Module):
 
 	def transpose_for_scores(self, x):
 		new_x_shape = tuple(x.shape[:-1]) + (self.num_attention_heads, self.attention_head_size)
-		# x = x.view(new_x_shape)
 		x = mx.reshape(x, new_x_shape)
-		# x = x.view(new_x_shape)
-		# return x.permute(0, 2, 1, 3)
 		return x.transpose([0, 2, 1, 3])
 
 	def __call__(
@@ -156,10 +149,8 @@ class BertSelfAttention(nn.Module):
 
 		context_layer = mx.matmul(attention_probs, value_layer)
 
-		# context_layer = context_layer.permute(0, 2, 1, 3)
 		context_layer = context_layer.transpose([0, 2, 1, 3])
 		new_context_layer_shape = tuple(context_layer.shape[:-2]) + (self.all_head_size,)
-		# context_layer = context_layer.view(new_context_layer_shape)
 		context_layer = context_layer.reshape(new_context_layer_shape)
 
 		outputs = (context_layer, attention_probs) if output_attentions else (context_layer,)
@@ -303,10 +294,6 @@ class BertLayer(nn.Module):
 		outputs = self_attention_outputs[1:]  # add self attentions if we output attention weights
 
 		cross_attn_present_key_value = None
-
-		# layer_output = apply_chunking_to_forward(
-		# 	self.feed_forward_chunk, self.chunk_size_feed_forward, self.seq_len_dim, attention_output
-		# )
 		intermediate_output = self.intermediate(attention_output)
 		layer_output = self.output(intermediate_output, attention_output)
 		outputs = (layer_output,) + outputs
@@ -381,14 +368,6 @@ class BertEncoder(nn.Module):
 			]
 			if v is not None
 		)
-		# if not return_dict:
-		# return BaseModelOutputWithPastAndCrossAttentions(
-		# 	last_hidden_state=hidden_states,
-		# 	past_key_values=next_decoder_cache,
-		# 	hidden_states=all_hidden_states,
-		# 	attentions=all_self_attentions,
-		# 	cross_attentions=all_cross_attentions,
-		# )
 
 class BertPooler(nn.Module):
     def __init__(self, config):
@@ -424,18 +403,6 @@ class MLXBertModel(nn.Module):
 	):
 		"""
 		Prepare the head mask if needed.
-
-		Args:
-			head_mask (`torch.Tensor` with shape `[num_heads]` or `[num_hidden_layers x num_heads]`, *optional*):
-				The mask indicating if we should keep the heads or not (1.0 for keep, 0.0 for discard).
-			num_hidden_layers (`int`):
-				The number of hidden layers in the model.
-			is_attention_chunked (`bool`, *optional*, defaults to `False`):
-				Whether or not the attentions scores are computed by chunks or not.
-
-		Returns:
-			`torch.Tensor` with shape `[num_hidden_layers x batch x num_heads x seq_length x seq_length]` or list with
-			`[None]` for each layer.
 		"""
 		if head_mask is not None:
 			head_mask = self._convert_head_mask_to_5d(head_mask, num_hidden_layers)

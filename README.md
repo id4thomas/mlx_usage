@@ -45,3 +45,13 @@ activation(x)
 	* BERT code from transformers package
 	* a lot of extensions were removed in WIP (ex. chunk feed forward, is_decoder checks, ..)
 
+inference_bert.py
+```
+>>> python inference_bert.py
+Loaded MLXBert: 0.008 sec
+Loaded Weight: 0.006 sec
+{'input_ids': array([[ 101, 7592,  102]]), 'token_type_ids': array([[0, 0, 0]]), 'attention_mask': array([[1, 1, 1]])}
+[1, 3, 768]
+[1, 768]
+array([-0.306098, 0.262229, -0.189619, ..., 0.379691, -0.125868, -0.114839], dtype=float32)
+```

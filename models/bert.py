@@ -467,3 +467,77 @@ class MLXBertModel(nn.Module):
 		pooled_output = self.pooler(sequence_output) if self.pooler is not None else None
 
 		return (sequence_output, pooled_output) + encoder_outputs[1:]
+
+# https://zhang-yang.medium.com/how-is-pytorchs-binary-cross-entropy-with-logits-function-related-to-sigmoid-and-d3bd8fb080e7
+def bce_with_logits(x, y):
+	x = mx.sigmoid(x)
+	return -(x.log()*y + (1-y)*(1-x).log()).mean()
+
+class BertForSequenceClassification(nn.Module):
+	def __init__(self, config):
+		super().__init__()
+		self.num_labels = config.num_labels
+		self.config = config
+
+		self.bert = MLXBertModel(config)
+		classifier_dropout = (
+			config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+		)
+		self.dropout = nn.Dropout(classifier_dropout)
+		self.classifier = nn.Linear(config.hidden_size, config.num_labels)
+
+	def __call__(
+		self,
+		input_ids = None,
+		attention_mask = None,
+		token_type_ids = None,
+		position_ids = None,
+		head_mask = None,
+		inputs_embeds = None,
+		labels = None,
+		output_attentions = None,
+		output_hidden_states = None,
+		return_dict = None
+	):
+
+		outputs = self.bert(
+			input_ids,
+			attention_mask=attention_mask,
+			token_type_ids=token_type_ids,
+			position_ids=position_ids,
+			head_mask=head_mask,
+			inputs_embeds=inputs_embeds,
+			output_attentions=output_attentions,
+			output_hidden_states=output_hidden_states,
+			return_dict=return_dict,
+		)
+
+		pooled_output = outputs[1]
+
+		pooled_output = self.dropout(pooled_output)
+		logits = self.classifier(pooled_output)
+
+		loss = None
+		if labels is not None:
+			if self.config.problem_type is None:
+				if self.num_labels == 1:
+					self.config.problem_type = "regression"
+				elif self.num_labels > 1 and (labels.dtype in [mx.int32, mx.int64]):
+					self.config.problem_type = "single_label_classification"
+				else:
+					self.config.problem_type = "multi_label_classification"
+
+			if self.config.problem_type == "regression":
+				# loss_fct = MSELoss()
+				if self.num_labels == 1:
+					loss = nn.losses.mse_loss(logits.squeeze(), labels.squeeze())
+				else:
+					loss = nn.losses.mse_loss(logits, labels)
+			elif self.config.problem_type == "single_label_classification":
+				loss = nn.losses.cross_entropy(logits.view(-1, self.num_labels), labels.view(-1))
+			elif self.config.problem_type == "multi_label_classification":
+				# loss_fct = BCEWithLogitsLoss()
+				loss = bce_with_logits(logits, labels)
+
+		output = (logits,) + outputs[2:]
+		return ((loss,) + output) if loss is not None else output

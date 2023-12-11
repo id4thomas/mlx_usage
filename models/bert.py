@@ -473,7 +473,7 @@ def bce_with_logits(x, y):
 	x = mx.sigmoid(x)
 	return -(x.log()*y + (1-y)*(1-x).log()).mean()
 
-class BertForSequenceClassification(nn.Module):
+class MLXBertForSequenceClassification(nn.Module):
 	def __init__(self, config):
 		super().__init__()
 		self.num_labels = config.num_labels
